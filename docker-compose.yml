@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    mem_limit: 512m
+    restart: always
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+    - my_network
+  
+  prefect-server:
+    image: prefecthq/prefect:2-python3.11
+    container_name: prefect-server
+    command: prefect server start --host 0.0.0.0
+    environment:
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+      - PREFECT_SERVER_API_PORT=4200
+      - PREFECT_UI_API_URL=http://localhost:4200/api
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://prefect:prefect@postgres/prefect
+    ports:
+      - "4200:4200"
+      - "4201:4201"
+    volumes:
+      - prefect_data:/home/prefect/.prefect
+    depends_on:
+      - postgres
+    networks:
+      - my_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  prefect-worker:
+    build: .
+    container_name: prefect-worker
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_DEBUG=1
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    volumes:
+      - ./flows:/opt/prefect/flows
+      - ./data:/opt/prefect/data
+    networks:
+      - my_network
+    restart: unless-stopped
+    command: >
+      sh -c "
+      echo 'Waiting for Prefect server...'
+      sleep 15
+      prefect work-pool create default --type process || true
+      prefect worker start --pool default --name my-worker
+      "
+
+  prefect-register:
+    build: .
+    container_name: prefect-register
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    command: >
+      sh -c "
+      echo 'Waiting for Prefect server...'
+      sleep 30
+      python /opt/prefect/flows/deploy_flow.py
+      "
+    networks:
+      - my_network
+    restart: "no"
+
+volumes:
+  prefect_data:
+  postgres_data:
+
+networks:
+  my_network:
+    external: true
