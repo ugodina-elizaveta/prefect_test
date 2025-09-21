@@ -1,89 +1,100 @@
+version: '3.8'
+
 services:
   postgres:
-    image: postgres:13
+    image: postgres:15
     container_name: postgres
     mem_limit: 512m
     restart: always
     environment:
-      POSTGRES_USER: prefect
-      POSTGRES_PASSWORD: prefect
-      POSTGRES_DB: prefect
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-    - my_network
-  
+      - my_network
+
+  kafka:
+    image: bitnami/kafka:4.0.0
+    container_name: kafka
+    mem_limit: 512m
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_BROKER_ID=1
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+    networks:
+      - my_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    mem_limit: 512m
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "MyCluster"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - my_network
+
+  # Prefect Server
   prefect-server:
     image: prefecthq/prefect:2-python3.11
     container_name: prefect-server
-    command: prefect server start --host 0.0.0.0
+    restart: always
+    volumes:
+      - prefect_data:/root/.prefect
     environment:
+      - PREFECT_UI_URL=http://127.0.0.1:4200/api
+      - PREFECT_API_URL=http://127.0.0.1:4200/api
       - PREFECT_SERVER_API_HOST=0.0.0.0
-      - PREFECT_SERVER_API_PORT=4200
-      - PREFECT_UI_API_URL=http://localhost:4200/api
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://prefect:prefect@postgres/prefect
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
     ports:
       - "4200:4200"
-      - "4201:4201"
-    volumes:
-      - prefect_data:/home/prefect/.prefect
+    entrypoint: ["prefect", "server", "start"]
     depends_on:
       - postgres
     networks:
       - my_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
+  # Prefect Worker
   prefect-worker:
-    build: .
+    image: prefecthq/prefect:2-python3.11
     container_name: prefect-worker
+    restart: always
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
-      - PREFECT_DEBUG=1
-    depends_on:
-      prefect-server:
-        condition: service_healthy
     volumes:
       - ./flows:/opt/prefect/flows
       - ./data:/opt/prefect/data
-    networks:
-      - my_network
-    restart: unless-stopped
+      - prefect_data:/root/.prefect
     command: >
-      sh -c "
-      echo 'Waiting for Prefect server...'
-      sleep 15
-      prefect work-pool create default --type process || true
-      prefect worker start --pool default --name my-worker
+      bash -c "
+        pip install psycopg2-binary kafka-python fastavro pandas &&
+        prefect work-pool create --type process default-pool || true &&
+        prefect worker start --pool default-pool
       "
-
-  prefect-register:
-    build: .
-    container_name: prefect-register
-    environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
     depends_on:
-      prefect-server:
-        condition: service_healthy
-    command: >
-      sh -c "
-      echo 'Waiting for Prefect server...'
-      sleep 30
-      python /opt/prefect/flows/deploy_flow.py
-      "
+      - prefect-server
     networks:
       - my_network
-    restart: "no"
 
 volumes:
-  prefect_data:
   postgres_data:
+  prefect_data:
 
 networks:
   my_network:
-    external: true
+    driver: bridge
