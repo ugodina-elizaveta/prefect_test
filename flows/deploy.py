@@ -1,4 +1,3 @@
-from prefect import flow
 from prefect.deployments import Deployment
 from prefect.server.schemas.schedules import CronSchedule
 from odata_tasks_flow import odata_tasks_flow
@@ -11,6 +10,6 @@ if __name__ == "__main__":
         work_pool_name="default-pool",
         tags=["odata", "kafka", "etl"]
     )
-    
+
     deployment.apply()
     print("Deployment created successfully!")

@@ -1,10 +1,8 @@
 import os
 import json
-import logging
 import shutil
-from datetime import timedelta
 from io import BytesIO
-from typing import List, Dict, Any, Generator, Tuple
+from typing import List, Dict, Any
 
 import fastavro
 import pandas as pd
@@ -12,7 +10,7 @@ import psycopg2
 from fastavro import writer, parse_schema
 from kafka import KafkaProducer
 from prefect import flow, task, get_run_logger
-from prefect.blocks.system import Secret
+# from prefect.blocks.system import Secret
 from prefect.task_runners import ConcurrentTaskRunner
 from psycopg2.extras import DictCursor
 
@@ -38,16 +36,16 @@ ODATA_TASKS_GENERATOR_TABLE = "odata_tasks_generator"
 
 @task(retries=1, retry_delay_seconds=300)
 def fetch_data_and_save_to_files(
-    directory_path: str, 
-    sql: str, 
-    avro_schema: dict, 
+    directory_path: str,
+    sql: str,
+    avro_schema: dict,
     batch_size: int = 1000
 ) -> None:
     """
     Извлекает данные из PostgreSQL и сохраняет их в файлы Avro батчами.
     """
     logger = get_run_logger()
-    
+
     # Очистка и создание директории
     if os.path.isdir(directory_path):
         if os.listdir(directory_path):
@@ -106,9 +104,9 @@ def send_messages_to_kafka(directory_path: str, topic_name: str, task_format: st
     Обработка всех файлов в директории и отправка их в Kafka в указанном формате.
     """
     logger = get_run_logger()
-    
+
     logger.info(f"directory_path {directory_path}, format: {task_format}")
-    
+
     if task_format not in ('avro', 'json'):
         raise ValueError(f"Unsupported format: {task_format}. Must be 'avro' or 'json'")
 
@@ -118,14 +116,14 @@ def send_messages_to_kafka(directory_path: str, topic_name: str, task_format: st
     try:
         for filename in os.listdir(directory_path):
             file_path = os.path.join(directory_path, filename)
-            
+
             with open(file_path, 'rb') as f:
                 file_data = f.read()
-                
+
                 if not file_data:
                     logger.warning(f"No data in {filename} for producing to Kafka")
                     continue
-                    
+
                 if task_format == 'json':
                     try:
                         # Преобразуем Avro в JSON
@@ -144,10 +142,10 @@ def send_messages_to_kafka(directory_path: str, topic_name: str, task_format: st
             # Удаление файла после отправки
             os.remove(file_path)
             logger.info(f"Sent and removed {filename}")
-            
+
         # Убеждаемся, что все сообщения отправлены
         producer.flush()
-        
+
     except Exception as e:
         logger.error(f"Error sending messages to Kafka: {e}")
         raise
@@ -161,29 +159,29 @@ def get_params() -> List[Dict[str, Any]]:
     Получает параметры задач из базы данных.
     """
     logger = get_run_logger()
-    
+
     conn = psycopg2.connect(**POSTGRES_CONFIG)
-    
+
     sql = f"""
         SELECT id, "sql", avro_schema, directory_path, topic_name, batch_size, task_name, task_format
         FROM {ODATA_TASKS_GENERATOR_TABLE}
         WHERE is_enabled = true
         ORDER BY task_name;
     """
-    
+
     try:
         df = pd.read_sql(sql, conn)
         tasks = df.to_dict(orient='records')
-        
-        for task in tasks:
-            task['directory_path'] = AIRFLOW_DATA_PATH + task['directory_path']
+
+        for taska in tasks:
+            taska['directory_path'] = AIRFLOW_DATA_PATH + taska['directory_path']
             # Парсим JSON строку в словарь для avro_schema
-            if isinstance(task['avro_schema'], str):
-                task['avro_schema'] = json.loads(task['avro_schema'])
-                
+            if isinstance(taska['avro_schema'], str):
+                taska['avro_schema'] = json.loads(taska['avro_schema'])
+
         logger.info(f"Found {len(tasks)} enabled tasks")
         return tasks
-        
+
     except Exception as e:
         logger.error(f"Error getting params: {e}")
         raise
@@ -202,19 +200,19 @@ def odata_tasks_flow():
     Основной flow для обработки задач извлечения данных и отправки в Kafka.
     """
     logger = get_run_logger()
-    
+
     try:
         # Получаем параметры всех задач
         params_list = get_params()
-        
+
         if not params_list:
             logger.info("No enabled tasks found")
             return
-        
+
         # Обрабатываем каждую задачу
         for param in params_list:
             logger.info(f"Processing task: {param['task_name']}")
-            
+
             # Извлекаем данные и сохраняем в файлы
             fetch_data_and_save_to_files(
                 directory_path=param['directory_path'],
@@ -222,16 +220,16 @@ def odata_tasks_flow():
                 avro_schema=param['avro_schema'],
                 batch_size=param['batch_size']
             )
-            
+
             # Отправляем данные в Kafka
             send_messages_to_kafka(
                 directory_path=param['directory_path'],
                 topic_name=param['topic_name'],
                 task_format=param['task_format']
             )
-            
+
             logger.info(f"Completed task: {param['task_name']}")
-            
+
     except Exception as e:
         logger.error(f"Flow failed: {e}")
         raise
