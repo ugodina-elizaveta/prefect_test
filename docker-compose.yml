@@ -82,6 +82,8 @@ services:
       bash -c "
         pip install psycopg2-binary kafka-python fastavro pandas &&
         prefect work-pool create --type process default-pool || true &&
+        cd /opt/prefect/flows &&
+        prefect deploy --all &&
         prefect worker start --pool default-pool
       "
     depends_on:
