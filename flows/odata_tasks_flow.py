@@ -235,6 +235,6 @@ def odata_tasks_flow():
         raise
 
 
-if __name__ == "__main__":
-    # Для тестирования локально
-    odata_tasks_flow()
+# if __name__ == "__main__":
+#     # Для тестирования локально
+#     odata_tasks_flow()
