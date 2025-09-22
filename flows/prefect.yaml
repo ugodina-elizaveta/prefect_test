@@ -1,0 +1,32 @@
+name: my-flows
+prefect-version: 3.0.0
+
+# используем локальные файлы
+build: null
+push: null
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /opt/prefect/flows
+
+deployments:
+  - name: odata-tasks-deployment
+    entrypoint: odata_tasks_flow.py:odata_tasks_flow
+    work_pool:
+      name: default-pool
+    schedule:
+      cron: "03 23 * * *"
+      timezone: "UTC"
+    tags:
+      - odata
+      - kafka
+      - etl
+
+  - name: test-flow-deployment
+    entrypoint: example.py:foo
+    work_pool:
+      name: default-pool
+    schedule:
+      cron: "0 2 * * *"
+      timezone: "UTC"
+    tags:
+      - test
