@@ -14,6 +14,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - my_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   kafka:
     image: bitnami/kafka:4.0.0
@@ -47,7 +52,6 @@ services:
     networks:
       - my_network
 
-  # Prefect Server
   prefect-server:
     image: prefecthq/prefect:3-python3.11
     container_name: prefect-server
@@ -63,31 +67,35 @@ services:
       - "4200:4200"
     entrypoint: ["prefect", "server", "start"]
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - my_network
-
-  # Единый Prefect Worker
+    healthcheck:
+      test: ["CMD", "prefect", "config", "view"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   prefect-worker:
     build: .
     container_name: prefect-worker
-    restart: always
+    restart: unless-stopped
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
     volumes:
       - ./data:/opt/prefect/data
     command: >
       bash -c "
-        echo '🔄 Checking files...' &&
-        ls -la /opt/prefect/ &&
         echo '🔄 Starting deployment process...' &&
         python /opt/prefect/scripts/deploy_flows.py &&
         echo '🚀 Starting workers...' &&
         python /opt/prefect/scripts/start_workers.py
       "
     depends_on:
-      - prefect-server
+      prefect-server:
+        condition: service_healthy
     networks:
       - my_network
 

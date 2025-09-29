@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Скрипт для запуска воркеров для всех work pools, найденных в prefect.yaml файлах.
+Скрипт для запуска воркеров для всех work pools.
 """
 
 import os
 import subprocess
-import threading
-import time
+import sys
 import yaml
 from pathlib import Path
 
@@ -36,57 +35,38 @@ def find_work_pools(flows_dir: str) -> set:
     return pools
 
 
-def start_worker(pool_name: str):
-    """Запускает воркер для указанного пула."""
-    print(f"🚀 Starting worker for pool: {pool_name}")
-    try:
-        subprocess.run(
-            ["prefect", "worker", "start", "--pool", pool_name],
-            check=True
-        )
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Worker for pool {pool_name} failed: {e}")
-    except KeyboardInterrupt:
-        print(f"🛑 Worker for pool {pool_name} stopped")
-
-
 def main():
+    print("🔍 Looking for work pools...")
     flows_dir = "/opt/prefect/flows"
 
     if not os.path.exists(flows_dir):
         print(f"❌ Flows directory not found: {flows_dir}")
-        return
+        sys.exit(1)
 
     pools = find_work_pools(flows_dir)
 
     if not pools:
-        print("ℹ️  No work pools found, starting default worker")
-        start_worker("default-pool")
+        print("⚠️  No work pools found, exiting...")
         return
 
-    print(f"Found work pools: {', '.join(pools)}")
+    print(f"🎯 Starting workers for pools: {', '.join(pools)}")
 
-    # Если только один пул, запускаем в основном потоке
-    if len(pools) == 1:
-        pool_name = list(pools)[0]
-        start_worker(pool_name)
-        return
-
-    # Если несколько пулов, запускаем в отдельных потоках
-    threads = []
+    # Запускаем воркеров последовательно (они работают в foreground)
     for pool_name in pools:
-        thread = threading.Thread(target=start_worker, args=(pool_name,))
-        thread.daemon = True
-        thread.start()
-        threads.append(thread)
-        time.sleep(2)  # Небольшая задержка между запусками
-
-    try:
-        # Ждем завершения всех потоков
-        for thread in threads:
-            thread.join()
-    except KeyboardInterrupt:
-        print("\n🛑 Stopping all workers...")
+        print(f"🚀 Starting worker for pool: {pool_name}")
+        try:
+            # Этот процесс будет работать пока не будет остановлен
+            subprocess.run(
+                ["prefect", "worker", "start", "--pool", pool_name],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Worker for pool {pool_name} failed: {e}")
+            # Продолжаем с следующим воркером
+            continue
+        except KeyboardInterrupt:
+            print(f"🛑 Worker for pool {pool_name} stopped by user")
+            break
 
 
 if __name__ == "__main__":

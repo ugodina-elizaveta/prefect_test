@@ -1,14 +1,12 @@
 name: prefect-orchestration
 prefect-version: 3.0.0
 
-# Глобальные настройки
 build: null
 push: null
 pull:
   - prefect.deployments.steps.set_working_directory:
       directory: /opt/prefect
 
-# Общие переменные (можно переопределить в отдельных файлах)
 variables:
   data_path: "/opt/prefect/data"
   postgres_host: "postgres"

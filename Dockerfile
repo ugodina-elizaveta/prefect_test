@@ -1,5 +1,6 @@
 FROM prefecthq/prefect:3-python3.11
 
+# Устанавливаем рабочую директорию
 WORKDIR /opt/prefect
 
 # Копируем файл зависимостей
@@ -13,11 +14,3 @@ COPY . .
 
 # Создаем необходимые директории
 RUN mkdir -p /opt/prefect/data
-
-# Устанавливаем рабочую директорию
-WORKDIR /opt/prefect
-
-# Проверяем что файлы скопированы
-RUN ls -la /opt/prefect/ && \
-    ls -la /opt/prefect/scripts/ && \
-    ls -la /opt/prefect/flows/
