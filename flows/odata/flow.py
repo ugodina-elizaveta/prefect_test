@@ -10,28 +10,10 @@ import psycopg2
 from fastavro import writer, parse_schema
 from kafka import KafkaProducer
 from prefect import flow, task, get_run_logger
-# from prefect.blocks.system import Secret
 from prefect.task_runners import ConcurrentTaskRunner
 from psycopg2.extras import DictCursor
 
-
-# Конфигурация
-POSTGRES_CONFIG = {
-    'host': 'postgres',
-    'port': 5432,
-    'database': 'postgres',
-    'user': 'postgres',
-    'password': 'postgres'
-}
-
-KAFKA_CONFIG = {
-    'bootstrap_servers': ['kafka:9092'],
-    'value_serializer': lambda x: x if isinstance(x, bytes) else x.encode('utf-8')
-}
-
-# Константы (в реальном проекте вынести в Prefect Variables)
-AIRFLOW_DATA_PATH = "/opt/prefect/data"
-ODATA_TASKS_GENERATOR_TABLE = "odata_tasks_generator"
+from shared.config import POSTGRES_CONFIG, KAFKA_CONFIG, AIRFLOW_DATA_PATH, ODATA_TASKS_GENERATOR_TABLE
 
 
 @task(retries=1, retry_delay_seconds=300)
@@ -233,8 +215,3 @@ def odata_tasks_flow():
     except Exception as e:
         logger.error(f"Flow failed: {e}")
         raise
-
-
-# if __name__ == "__main__":
-#     # Для тестирования локально
-#     odata_tasks_flow()

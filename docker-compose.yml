@@ -67,24 +67,24 @@ services:
     networks:
       - my_network
 
-  # Prefect Worker
+  # Единый Prefect Worker
+
   prefect-worker:
-    image: prefecthq/prefect:3-python3.11
+    build: .
     container_name: prefect-worker
     restart: always
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
     volumes:
-      - ./flows:/opt/prefect/flows
       - ./data:/opt/prefect/data
-      - prefect_data:/root/.prefect
     command: >
       bash -c "
-        pip install psycopg2-binary kafka-python fastavro pandas &&
-        prefect work-pool create --type process default-pool || true &&
-        cd /opt/prefect/flows &&
-        prefect deploy --all &&
-        prefect worker start --pool default-pool
+        echo '🔄 Checking files...' &&
+        ls -la /opt/prefect/ &&
+        echo '🔄 Starting deployment process...' &&
+        python /opt/prefect/scripts/deploy_flows.py &&
+        echo '🚀 Starting workers...' &&
+        python /opt/prefect/scripts/start_workers.py
       "
     depends_on:
       - prefect-server

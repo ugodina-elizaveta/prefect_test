@@ -1,0 +1,20 @@
+name: example-flows
+prefect-version: 3.0.0
+
+build: null
+push: null
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /opt/prefect
+
+deployments:
+  - name: test-flow-deployment
+    entrypoint: flows/example/flow.py:foo
+    work_pool:
+      name: default-pool
+    schedule:
+      cron: "0 2 * * *"
+      timezone: "UTC"
+    tags:
+      - test
+      - example

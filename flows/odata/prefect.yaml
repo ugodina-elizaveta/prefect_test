@@ -1,0 +1,21 @@
+name: odata-flows
+prefect-version: 3.0.0
+
+build: null
+push: null
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /opt/prefect
+
+deployments:
+  - name: odata-tasks-deployment
+    entrypoint: flows/odata/flow.py:odata_tasks_flow
+    work_pool:
+      name: odata-pool
+    schedule:
+      cron: "03 23 * * *"
+      timezone: "UTC"
+    tags:
+      - odata
+      - kafka
+      - etl
