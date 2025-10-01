@@ -1,7 +1,7 @@
 from prefect import flow, get_run_logger
 from prefect.task_runners import ConcurrentTaskRunner
 from .tasks import get_params
-from .subflows import process_single_task_subflow
+from .subflows import create_task_subflow
 
 
 @flow(
@@ -30,7 +30,11 @@ def odata_tasks_flow():
         # Запускаем subflow для каждой задачи
         results = []
         for param in params_list:
-            result = process_single_task_subflow(param)
+            logger.info(f"Creating subflow for: {param['task_name']}")
+
+            # Создаем и запускаем subflow с конкретным именем
+            task_subflow = create_task_subflow(param)
+            result = task_subflow()
             results.append(result)
 
         logger.info("All tasks completed successfully")

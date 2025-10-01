@@ -9,7 +9,7 @@ pull:
 
 deployments:
   - name: odata-tasks-production
-    entrypoint: flows/odata/main_flow.py:odata_tasks_flow
+    entrypoint: flows/odata/flow.py:odata_tasks_flow
     work_pool:
       name: odata-pool
     schedule:
