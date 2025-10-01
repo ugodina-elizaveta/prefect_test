@@ -8,8 +8,8 @@ pull:
       directory: /opt/prefect
 
 deployments:
-  - name: odata-tasks-deployment
-    entrypoint: flows/odata/flow.py:odata_tasks_flow
+  - name: odata-tasks-production
+    entrypoint: flows/odata/main_flow.py:odata_tasks_flow
     work_pool:
       name: odata-pool
     schedule:
@@ -19,3 +19,6 @@ deployments:
       - odata
       - kafka
       - etl
+      - postgres
+      - production
+    description: "Production deployment for OData ETL tasks with subflow organization"

@@ -41,11 +41,20 @@ def find_prefect_files(flows_dir: str) -> list:
     prefect_files = []
     flows_path = Path(flows_dir)
 
+    # Ищем prefect.yaml в корне flows/odata/
     for item in flows_path.iterdir():
         if item.is_dir():
+            # Проверяем корневую директорию flow
             prefect_file = item / "prefect.yaml"
             if prefect_file.exists():
                 prefect_files.append(str(prefect_file))
+
+            # Также проверяем вложенные директории (на всякий случай)
+            for sub_item in item.iterdir():
+                if sub_item.is_dir():
+                    sub_prefect_file = sub_item / "prefect.yaml"
+                    if sub_prefect_file.exists():
+                        prefect_files.append(str(sub_prefect_file))
 
     return prefect_files
 
