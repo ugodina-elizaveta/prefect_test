@@ -63,7 +63,7 @@ def create_work_pool(pool_name: str, max_retries=5) -> bool:
     """Создает work pool с retry логикой."""
     for attempt in range(max_retries):
         try:
-            result = subprocess.run(
+            subprocess.run(
                 ["prefect", "work-pool", "create", "--type", "process", pool_name],
                 capture_output=True,
                 text=True,
@@ -89,7 +89,7 @@ def deploy_flow(prefect_file: str, max_retries=3) -> bool:
     for attempt in range(max_retries):
         try:
             print(f"🚀 Deploying {prefect_file} (attempt {attempt+1}/{max_retries})...")
-            result = subprocess.run(
+            subprocess.run(
                 ["prefect", "deploy", "--prefect-file", prefect_file],
                 capture_output=True,
                 text=True,
@@ -99,7 +99,7 @@ def deploy_flow(prefect_file: str, max_retries=3) -> bool:
             print(f"✅ Successfully deployed {prefect_file}")
             return True
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.lower()
+            e.stderr.lower()
             if attempt < max_retries - 1:
                 wait_time = (attempt + 1) * 5
                 print(f"⚠️  Deployment failed (attempt {attempt+1}), retrying in {wait_time}s...")

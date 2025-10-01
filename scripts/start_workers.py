@@ -23,10 +23,10 @@ def cleanup_old_workers():
             text=True,
             check=True
         )
-        
+
         import json
         workers = json.loads(result.stdout)
-        
+
         for worker in workers:
             if worker.get('status') == 'OFFLINE':
                 worker_name = worker.get('name')
@@ -35,7 +35,7 @@ def cleanup_old_workers():
                     ["prefect", "worker", "delete", "--name", worker_name],
                     capture_output=True
                 )
-                
+
     except Exception as e:
         print(f"⚠️  Could not cleanup old workers: {e}")
 
@@ -77,24 +77,24 @@ def start_worker_process(pool_name: str):
             bufsize=1,
             universal_newlines=True
         )
-        
+
         # Читаем вывод в реальном времени
         def read_output(stream, prefix):
             for line in iter(stream.readline, ''):
                 if line:
                     print(f"[{prefix}] {line.strip()}")
-        
+
         stdout_thread = threading.Thread(target=read_output, args=(process.stdout, pool_name))
         stderr_thread = threading.Thread(target=read_output, args=(process.stderr, f"{pool_name}-ERROR"))
-        
+
         stdout_thread.daemon = True
         stderr_thread.daemon = True
-        
+
         stdout_thread.start()
         stderr_thread.start()
-        
+
         return process
-            
+
     except Exception as e:
         print(f"❌ Failed to start worker for pool {pool_name}: {e}")
         return None
@@ -132,7 +132,7 @@ def main():
     try:
         while True:
             time.sleep(10)
-            
+
             # Проверяем статус процессов
             for pool_name, process in processes:
                 return_code = process.poll()
