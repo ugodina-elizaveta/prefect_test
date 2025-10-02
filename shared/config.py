@@ -16,5 +16,5 @@ KAFKA_CONFIG = {
 }
 
 # Пути
-AIRFLOW_DATA_PATH = os.getenv('DATA_PATH', '/opt/prefect/data')
+AIRFLOW_DATA_PATH = os.getenv('DATA_PATH', '/opt/prefect/data/')
 ODATA_TASKS_GENERATOR_TABLE = "odata_tasks_generator"

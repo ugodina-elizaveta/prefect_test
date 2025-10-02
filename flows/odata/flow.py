@@ -3,7 +3,6 @@ import json
 import shutil
 from io import BytesIO
 from typing import List, Dict, Any
-
 import fastavro
 import pandas as pd
 import psycopg2
@@ -21,7 +20,7 @@ def fetch_data_and_save_to_files(
     sql: str,
     avro_schema: dict,
     batch_size: int = 1000
-) -> str:  # Возвращаем directory_path для передачи в следующий таск
+) -> str:
     """
     Извлекает данные из PostgreSQL и сохраняет их в файлы Avro батчами.
     """
@@ -172,23 +171,18 @@ def get_params() -> List[Dict[str, Any]]:
         conn.close()
 
 
-@flow(
-    name="Process Single Task",
-    description="Processes a single data extraction and Kafka publishing task"
-)
-def process_single_task(param: Dict[str, Any]):
+@task(name="Process Single Task")
+def process_single_task_as_task(param: Dict[str, Any]):
     """
-    Subflow для обработки одной задачи.
+    Task для обработки одной задачи (вместо subflow).
     """
     logger = get_run_logger()
     task_name = param['task_name']
-    
+
     logger.info(f"Processing task: {task_name}")
 
     # Извлекаем данные и сохраняем в файлы
-    directory_path = fetch_data_and_save_to_files.with_options(
-        name=f"📥 Extract Data - {task_name}"
-    )(
+    directory_path = fetch_data_and_save_to_files(
         directory_path=param['directory_path'],
         sql=param['sql'],
         avro_schema=param['avro_schema'],
@@ -196,15 +190,14 @@ def process_single_task(param: Dict[str, Any]):
     )
 
     # Отправляем данные в Kafka (используем результат предыдущего таска)
-    send_messages_to_kafka.with_options(
-        name=f"📤 Send to Kafka - {task_name}"
-    )(
-        directory_path=directory_path,  # Используем результат предыдущего таска
+    send_messages_to_kafka(
+        directory_path=directory_path,
         topic_name=param['topic_name'],
         task_format=param['task_format']
     )
 
     logger.info(f"Completed task: {task_name}")
+    return f"Task {task_name} completed successfully"
 
 
 @flow(
@@ -227,11 +220,21 @@ def odata_tasks_flow():
             logger.info("No enabled tasks found")
             return
 
-        # Создаем subflow для каждой задачи
+        # Запускаем все задачи параллельно с помощью submit()
+        submitted_tasks = []
         for param in params_list:
-            process_single_task.with_options(
+            # Используем submit() для асинхронного запуска task'а
+            submitted_task = process_single_task_as_task.with_options(
                 name=f"🔄 Task Group: {param['task_name']}"
-            )(param)
+            ).submit(param)
+            submitted_tasks.append(submitted_task)
+
+        # Ждем завершения всех задач
+        results = []
+        for submitted_task in submitted_tasks:
+            result = submitted_task.result()
+            results.append(result)
+            logger.info(f"Task result: {result}")
 
         logger.info("All tasks completed successfully")
 
